@@ -12,7 +12,6 @@ const express = require('express');
 const delta = require('../');
 
 const diff = new DiffMatchPatch;
-const PORT = 6767;
 
 const EXPRESS_OPTIONS = {
   key: fs.readFileSync('/home/bill/.ssh/key.pem'),
@@ -45,6 +44,7 @@ describe('delta', function(){
       let server = https.createServer(EXPRESS_OPTIONS, app).listen(DEFAULT_REQUEST_OPTIONS.port, () => {
         GET(DEFAULT_REQUEST_OPTIONS).then(({ data, response }) => {
           assert.strictEqual(data, text);
+          // etag should always be given
           assert.isDefined(response.headers['etag']);
           server.close(done);
         }).catch(error => {
@@ -53,7 +53,6 @@ describe('delta', function(){
       });
     });
   });
-
 
   describe("client request has matching etag in If-None-Match header", function() {
     it("should get a 224 response with working delta", function(done) {
@@ -74,6 +73,7 @@ describe('delta', function(){
 
       let cache;
       let server = https.createServer(EXPRESS_OPTIONS, app).listen(DEFAULT_REQUEST_OPTIONS.port, () => {
+        // first request (nothing cached)
         GET(util._extend(DEFAULT_REQUEST_OPTIONS, {
           headers: {
             'A-IM': 'googlediffjson'
@@ -89,14 +89,16 @@ describe('delta', function(){
               'If-None-Match': response.headers['etag']
             }
           }));
+        // second request (version1 cached)
         }).then(({ data, response }) => {
           assert.isDefined(response.headers['etag']);
           assert.strictEqual(response.statusCode, 226);
+          assert.strictEqual(response.headers['im'], 'googlediffjson');
 
           let patches = JSON.parse(data);
           let patchedVersion = diff.patch_apply(patches, cache)[0];
+          // ensure the patched version is the same as the one on the server
           assert.strictEqual(patchedVersion, version2);
-          assert.strictEqual(response.headers['im'], 'googlediffjson');
           server.close(done);
         }).catch(error => {
           throw new Error(error);
@@ -132,6 +134,12 @@ describe('delta', function(){
 
 });
 
+/**
+ * Gets resource via https
+ * @param options       options for http.request
+ * @returns {Promise}
+ * @constructor
+ */
 function GET(options) {
   return new Promise((resolve, reject) => {
     let req = https.get(options, (res) => {
