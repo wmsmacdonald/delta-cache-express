@@ -15,6 +15,7 @@ var deltaCache = DeltaCache();
 var app = express();
 app.get('/dynamicContent', function(req, res, next) {
  res.locals.responseBody = new Date().toString();
+ next();
 }, deltaCache);
 
 ```
