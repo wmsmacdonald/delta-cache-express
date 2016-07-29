@@ -9,7 +9,7 @@ const assert = require('chai').assert;
 const DiffMatchPatch = require('diff-match-patch');
 const express = require('express');
 
-const delta = require('../');
+const DeltaCache = require('../');
 
 const diff = new DiffMatchPatch();
 
@@ -24,22 +24,24 @@ const DEFAULT_REQUEST_OPTIONS = {
   path: '/dynamicContent'
 };
 
-describe('delta', function(){
+describe('DeltaCache', function(){
   it("should return valid middleware", function() {
+    let deltaCache = DeltaCache();
     let app = express();
     app.get(DEFAULT_REQUEST_OPTIONS.path, (res, req) => {
       req.locals.responseBody = 'some response';
-    }, delta);
+    }, deltaCache);
   });
 
   describe("client request doesn't have A-IM header", function() {
     it("should get full response with etag", function (done) {
+      let deltaCache = DeltaCache();
       let app = express();
       let text = 'some response';
       app.get(DEFAULT_REQUEST_OPTIONS.path, (res, req, next) => {
         req.locals.responseBody = text;
         next();
-      }, delta);
+      }, deltaCache);
 
       let server = https.createServer(EXPRESS_OPTIONS, app).listen(DEFAULT_REQUEST_OPTIONS.port, () => {
         GET(DEFAULT_REQUEST_OPTIONS).then(({ data, response }) => {
@@ -78,7 +80,7 @@ describe('delta', function(){
       }]).then(done).catch(done);
     });
   });
-  describe("client request has matching etag in If-None-Match header but content hasn't changed", function() {
+  describe("client request has matching etag in If-None-Match header and content hasn't changed", function() {
     it("should get a 304 response without a response body", function(done) {
       let text = 'some text';
 
@@ -86,7 +88,7 @@ describe('delta', function(){
 
         assert.strictEqual(data, text);
         assert.isDefined(res.headers['etag']);
-        assert.notStrictEqual(res.headers['IM'], 'googlediffjson');
+        assert.notStrictEqual(res.headers['im'], 'googlediffjson');
 
       }, (data, res) => {
         assert.isDefined(res.headers['etag']);
@@ -102,12 +104,13 @@ describe('delta', function(){
 
   describe("client request has non-matching etag in If-None-Match header", function() {
     it("should get full response", function(done) {
+      let deltaCache = DeltaCache();
       let app = express();
       let text = 'some response';
       app.get(DEFAULT_REQUEST_OPTIONS.path, (res, req, next) => {
         req.locals.responseBody = text;
         next();
-      }, delta);
+      }, deltaCache);
       let server = https.createServer(EXPRESS_OPTIONS, app).listen(DEFAULT_REQUEST_OPTIONS.port, () => {
         GET(util._extend(DEFAULT_REQUEST_OPTIONS, {
           headers: {
@@ -151,13 +154,13 @@ function GET(options) {
 }
 
 function simulateServerAndRequests(responseBodies, callbacks) {
+  let deltaCache = DeltaCache();
   let app = express();
-
   let responseNum = 0;
   app.get(DEFAULT_REQUEST_OPTIONS.path, (req, res, next) => {
     res.locals.responseBody = responseBodies[responseNum++];
     next();
-  }, delta);
+  }, deltaCache);
   return new Promise((resolve, reject) => {
     let server = https.createServer(EXPRESS_OPTIONS, app).listen(DEFAULT_REQUEST_OPTIONS.port, () => {
 
@@ -196,14 +199,19 @@ function simulateRequests(requestOptions, etag, callbacks) {
   });
 }
 
+/**
+ * make a request, offering
+ * @param requestOptions
+ * @param etag
+ * @returns {Promise}
+ */
 function request(requestOptions, etag) {
-  let options = util._extend(requestOptions, {
-    headers: {
-      'A-IM': 'googlediffjson'
-    }
-  });
+  let options = util._extend(requestOptions);
   if (etag !== undefined) {
-    options.headers['If-None-Match'] = etag;
+    options.headers = {
+      'A-IM': 'googlediffjson',
+      'If-None-Match': etag
+    };
   }
   return GET(options);
 }
