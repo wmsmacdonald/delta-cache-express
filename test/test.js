@@ -90,8 +90,11 @@ describe('delta', function(){
 
       }, (data, res) => {
         assert.isDefined(res.headers['etag']);
+        // status not changed
         assert.strictEqual(res.statusCode, 304);
+        // shouldnt' be any delta compression
         assert.notStrictEqual(res.headers['im'], 'googlediffjson');
+        // shouldn't have a response body
         assert.strictEqual(data, '');
       }]).then(done).catch(done);
     });
@@ -172,6 +175,13 @@ function simulateServerAndRequests(responseBodies, callbacks) {
   })
 }
 
+/**
+ * Recurisve method that keeps making requests (with etag if availible) as long as there are callbacks
+ * @param requestOptions  https request options
+ * @param etag  {string|undefined}  etag to include in If-Match-None header (only if defined)
+ * @param callbacks {array} functions executed with params after request with params (data, response)
+ * @returns {Promise}
+ */
 function simulateRequests(requestOptions, etag, callbacks) {
   return new Promise((resolve, reject) => {
     if (callbacks.length > 0) {
