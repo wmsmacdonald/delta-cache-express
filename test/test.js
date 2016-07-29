@@ -60,7 +60,7 @@ describe('delta', function(){
       let version2 = 'body 2';
 
       let cache;
-      simulateRequests([version1, version2], [(data, res) => {
+      simulateServerAndRequests([version1, version2], [(data, res) => {
         cache = data;
 
         assert.strictEqual(data, version1);
@@ -78,11 +78,11 @@ describe('delta', function(){
       }]).then(done).catch(done);
     });
   });
-  /*describe("client request has matching etag in If-None-Match header but content hasn't changed", function() {
+  describe("client request has matching etag in If-None-Match header but content hasn't changed", function() {
     it("should get a 304 response without a response body", function(done) {
       let text = 'some text';
 
-      twoRequests(done, text, text, (data, res) => {
+      simulateServerAndRequests([text, text], [(data, res) => {
 
         assert.strictEqual(data, text);
         assert.isDefined(res.headers['etag']);
@@ -93,9 +93,9 @@ describe('delta', function(){
         assert.strictEqual(res.statusCode, 304);
         assert.notStrictEqual(res.headers['im'], 'googlediffjson');
         assert.strictEqual(data, '');
-      });
+      }]).then(done).catch(done);
     });
-  });*/
+  });
 
   describe("client request has non-matching etag in If-None-Match header", function() {
     it("should get full response", function(done) {
@@ -147,7 +147,7 @@ function GET(options) {
   });
 }
 
-function simulateRequests(responseBodies, callbacks) {
+function simulateServerAndRequests(responseBodies, callbacks) {
   let app = express();
 
   let responseNum = 0;
@@ -158,7 +158,7 @@ function simulateRequests(responseBodies, callbacks) {
   return new Promise((resolve, reject) => {
     let server = https.createServer(EXPRESS_OPTIONS, app).listen(DEFAULT_REQUEST_OPTIONS.port, () => {
 
-      simulRequest(DEFAULT_REQUEST_OPTIONS, undefined, callbacks).then(() => {
+      simulateRequests(DEFAULT_REQUEST_OPTIONS, undefined, callbacks).then(() => {
         server.close(err => {
           if (err) {
             reject(err);
@@ -172,12 +172,12 @@ function simulateRequests(responseBodies, callbacks) {
   })
 }
 
-function simulRequest(requestOptions, etag, callbacks) {
+function simulateRequests(requestOptions, etag, callbacks) {
   return new Promise((resolve, reject) => {
     if (callbacks.length > 0) {
       request(requestOptions, etag).then(({ data, response }) => {
         callbacks[0](data, response);
-        return simulRequest(requestOptions, response.headers['etag'], callbacks.splice(1));
+        return simulateRequests(requestOptions, response.headers['etag'], callbacks.splice(1));
       }).then(resolve).catch(reject);
     }
     else {
