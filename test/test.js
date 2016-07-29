@@ -14,8 +14,8 @@ const DeltaCache = require('../');
 const diff = new DiffMatchPatch();
 
 const EXPRESS_OPTIONS = {
-  key: fs.readFileSync('/home/bill/.ssh/key.pem'),
-  cert: fs.readFileSync('/home/bill/.ssh/cert.pem')
+  key: fs.readFileSync('./ssl/test_key.pem'),
+  cert: fs.readFileSync('./ssl/test_cert.pem')
 };
 
 const DEFAULT_REQUEST_OPTIONS = {
