@@ -11,7 +11,7 @@ const express = require('express');
 
 const delta = require('../');
 
-const diff = new DiffMatchPatch;
+const diff = new DiffMatchPatch();
 
 const EXPRESS_OPTIONS = {
   key: fs.readFileSync('/home/bill/.ssh/key.pem'),
@@ -54,58 +54,49 @@ describe('delta', function(){
     });
   });
 
-  describe("client request has matching etag in If-None-Match header", function() {
-    it("should get a 224 response with working delta", function(done) {
-      let app = express();
-      let version1 = 'sample test 1';
-      let version2 = 'sample test 2';
-      let first = true;
-      app.get(DEFAULT_REQUEST_OPTIONS.path, (req, res, next) => {
-        if (first) {
-          res.locals.responseBody = version1;
-          first = false;
-        }
-        else {
-          res.locals.responseBody = version2;
-        }
-        next();
-      }, delta);
+  describe("client request has matching etag in If-None-Match header and content has changed", function() {
+    it("should get a 226 response with working delta", function(done) {
+      let version1 = 'body 1';
+      let version2 = 'body 2';
 
       let cache;
-      let server = https.createServer(EXPRESS_OPTIONS, app).listen(DEFAULT_REQUEST_OPTIONS.port, () => {
-        // first request (nothing cached)
-        GET(util._extend(DEFAULT_REQUEST_OPTIONS, {
-          headers: {
-            'A-IM': 'googlediffjson'
-          }
-        })).then(({ data, response }) => {
-          cache = data;
-          assert.strictEqual(data, version1);
-          assert.isDefined(response.headers['etag']);
-          assert.notStrictEqual(response.headers['IM'], 'googlediffjson');
-          return GET(util._extend(DEFAULT_REQUEST_OPTIONS, {
-            headers: {
-              'A-IM': 'googlediffjson',
-              'If-None-Match': response.headers['etag']
-            }
-          }));
-        // second request (version1 cached)
-        }).then(({ data, response }) => {
-          assert.isDefined(response.headers['etag']);
-          assert.strictEqual(response.statusCode, 226);
-          assert.strictEqual(response.headers['im'], 'googlediffjson');
+      simulateRequests([version1, version2], [(data, res) => {
+        cache = data;
 
-          let patches = JSON.parse(data);
-          let patchedVersion = diff.patch_apply(patches, cache)[0];
-          // ensure the patched version is the same as the one on the server
-          assert.strictEqual(patchedVersion, version2);
-          server.close(done);
-        }).catch(error => {
-          throw new Error(error);
-        })
-      });
+        assert.strictEqual(data, version1);
+        assert.isDefined(res.headers['etag']);
+        assert.notStrictEqual(res.headers['IM'], 'googlediffjson');
+
+      }, (data, res) => {
+        assert.isDefined(res.headers['etag']);
+        assert.strictEqual(res.statusCode, 226);
+        assert.strictEqual(res.headers['im'], 'googlediffjson');
+        let patches = JSON.parse(data);
+        let patchedVersion = diff.patch_apply(patches, cache)[0];
+        // ensure the patched version is the same as the one on the server
+        assert.strictEqual(patchedVersion, version2);
+      }]).then(done).catch(done);
     });
   });
+  /*describe("client request has matching etag in If-None-Match header but content hasn't changed", function() {
+    it("should get a 304 response without a response body", function(done) {
+      let text = 'some text';
+
+      twoRequests(done, text, text, (data, res) => {
+
+        assert.strictEqual(data, text);
+        assert.isDefined(res.headers['etag']);
+        assert.notStrictEqual(res.headers['IM'], 'googlediffjson');
+
+      }, (data, res) => {
+        assert.isDefined(res.headers['etag']);
+        assert.strictEqual(res.statusCode, 304);
+        assert.notStrictEqual(res.headers['im'], 'googlediffjson');
+        assert.strictEqual(data, '');
+      });
+    });
+  });*/
+
   describe("client request has non-matching etag in If-None-Match header", function() {
     it("should get full response", function(done) {
       let app = express();
@@ -154,4 +145,55 @@ function GET(options) {
     });
     req.on('error', reject);
   });
+}
+
+function simulateRequests(responseBodies, callbacks) {
+  let app = express();
+
+  let responseNum = 0;
+  app.get(DEFAULT_REQUEST_OPTIONS.path, (req, res, next) => {
+    res.locals.responseBody = responseBodies[responseNum++];
+    next();
+  }, delta);
+  return new Promise((resolve, reject) => {
+    let server = https.createServer(EXPRESS_OPTIONS, app).listen(DEFAULT_REQUEST_OPTIONS.port, () => {
+
+      simulRequest(DEFAULT_REQUEST_OPTIONS, undefined, callbacks).then(() => {
+        server.close(err => {
+          if (err) {
+            reject(err);
+          }
+          else {
+            resolve();
+          }
+        });
+      }).catch(reject);
+    });
+  })
+}
+
+function simulRequest(requestOptions, etag, callbacks) {
+  return new Promise((resolve, reject) => {
+    if (callbacks.length > 0) {
+      request(requestOptions, etag).then(({ data, response }) => {
+        callbacks[0](data, response);
+        return simulRequest(requestOptions, response.headers['etag'], callbacks.splice(1));
+      }).then(resolve).catch(reject);
+    }
+    else {
+      resolve();
+    }
+  });
+}
+
+function request(requestOptions, etag) {
+  let options = util._extend(requestOptions, {
+    headers: {
+      'A-IM': 'googlediffjson'
+    }
+  });
+  if (etag !== undefined) {
+    options.headers['If-None-Match'] = etag;
+  }
+  return GET(options);
 }
