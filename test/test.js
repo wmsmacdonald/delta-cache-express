@@ -1,6 +1,7 @@
 'use strict';
 
 const https = require('https');
+const http = require('http');
 const fs = require('fs');
 const url = require('url');
 const util = require('util');
@@ -48,9 +49,11 @@ describe('DeltaCache', function(){
           assert.strictEqual(data, text);
           // etag should always be given
           assert.isDefined(response.headers['etag']);
+          assert.strictEqual(response.statusCode, 200);
+          assert.strictEqual(response.statusMessage, 'OK');
           server.close(done);
         }).catch(error => {
-          throw new Error(error);
+          done(error);
         });
       });
     });
@@ -64,14 +67,16 @@ describe('DeltaCache', function(){
       let cache;
       simulateServerAndRequests([version1, version2], [(data, res) => {
         cache = data;
-
+        // first response asserts
         assert.strictEqual(data, version1);
         assert.isDefined(res.headers['etag']);
         assert.notStrictEqual(res.headers['IM'], 'googlediffjson');
 
       }, (data, res) => {
+        // second response asserts
         assert.isDefined(res.headers['etag']);
         assert.strictEqual(res.statusCode, 226);
+        assert.strictEqual(res.statusMessage, 'IM Used');
         assert.strictEqual(res.headers['im'], 'googlediffjson');
         let patches = JSON.parse(data);
         let patchedVersion = diff.patch_apply(patches, cache)[0];
@@ -94,6 +99,7 @@ describe('DeltaCache', function(){
         assert.isDefined(res.headers['etag']);
         // status not changed
         assert.strictEqual(res.statusCode, 304);
+        assert.strictEqual(res.statusMessage, 'Not Modified');
         // shouldnt' be any delta compression
         assert.notStrictEqual(res.headers['im'], 'googlediffjson');
         // shouldn't have a response body
@@ -120,7 +126,9 @@ describe('DeltaCache', function(){
         })).then(({ data, response }) => {
           assert.strictEqual(data, text);
           assert.isDefined(response.headers['etag']);
-          assert.notStrictEqual(response.headers['IM'], 'googlediffjson');
+          assert.isUndefined(response.headers['im']);
+          assert.strictEqual(response.statusCode, 200);
+          assert.strictEqual(response.statusMessage, 'OK');
           server.close(done);
         }).catch(error => {
           throw new Error(error);
