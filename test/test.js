@@ -70,7 +70,7 @@ describe('DeltaCache', function(){
         // first response asserts
         assert.strictEqual(data, version1);
         assert.isDefined(res.headers['etag']);
-        assert.notStrictEqual(res.headers['IM'], 'googlediffjson');
+        assert.isUndefined(res.headers['im']);
 
       }, (data, res) => {
         // second response asserts
@@ -93,7 +93,7 @@ describe('DeltaCache', function(){
 
         assert.strictEqual(data, text);
         assert.isDefined(res.headers['etag']);
-        assert.notStrictEqual(res.headers['im'], 'googlediffjson');
+        assert.isUndefined(res.headers['im']);
 
       }, (data, res) => {
         assert.isDefined(res.headers['etag']);
@@ -101,7 +101,7 @@ describe('DeltaCache', function(){
         assert.strictEqual(res.statusCode, 304);
         assert.strictEqual(res.statusMessage, 'Not Modified');
         // shouldnt' be any delta compression
-        assert.notStrictEqual(res.headers['im'], 'googlediffjson');
+        assert.isUndefined(res.headers['im']);
         // shouldn't have a response body
         assert.strictEqual(data, '');
       }]).then(done).catch(done);
