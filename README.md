@@ -23,8 +23,8 @@ app.get('/dynamicContent', function(req, res, next) {
 
 ## Function: DeltaCache
 
-Returns a middleware function `deltaCache` for a cache instance
+Returns a middleware function `deltaCache` that acts on a cache instance.
 
 ### deltaCache(req, res, next)
 
-Inspects request for delta compatibiliy and uses `res.locals.responseBody` as the target for the client to produce. Sends either a 200, 304, or 226 response (see [RFC 3229](https://tools.ietf.org/html/rfc3229) for more information)
+Inspects request for delta compatibiliy and uses `res.locals.responseBody` as the target for the client to produce. Sends either a 200, 304, or 226 response (see [RFC 3229](https://tools.ietf.org/html/rfc3229) for more information).
