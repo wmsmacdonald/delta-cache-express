@@ -1,8 +1,8 @@
 {
   "name": "delta-cache-express",
   "version": "0.1.2",
-  "description": "Express middleware for delta caching server support",
-  "main": "lib/index.js",
+  "description": "Express middleware for delta encoding server support",
+  "main": "index.js",
   "directories": {
     "test": "test"
   },
@@ -27,12 +27,12 @@
   },
   "homepage": "https://github.com/wmsmacdonald/delta-cache-express#readme",
   "dependencies": {
-    "text-history": "^1.0.5"
+    "delta-cache": "^0.2.0"
   },
   "devDependencies": {
     "chai": "^3.5.0",
-    "diff-match-patch": "^1.0.0",
     "express": "^4.14.0",
-    "mocha": "^2.5.3"
+    "mocha": "^2.5.3",
+    "vcdiff": "0.0.2"
   }
 }
